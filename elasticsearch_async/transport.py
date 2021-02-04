@@ -46,11 +46,10 @@ class AsyncTransport(Transport):
         if self.sniffing_task is None:
             self.sniffing_task = ensure_future(self.sniff_hosts(initial), loop=self.loop)
 
-    @asyncio.coroutine
-    def close(self):
+    async def close(self):
         if self.sniffing_task:
             self.sniffing_task.cancel()
-        yield from self.connection_pool.close()
+        await self.connection_pool.close()
 
     def set_connections(self, hosts):
         super().set_connections(hosts)
