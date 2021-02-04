@@ -11,15 +11,16 @@ from elasticsearch import NotFoundError, ConnectionTimeout
 from elasticsearch_async.connection import AIOHttpConnection
 
 @mark.asyncio
-def test_info(connection):
-    status, headers, data = yield from connection.perform_request('GET', '/')
+async def test_info(connection):
+    status, headers, data = await connection.perform_request('GET', '/')
 
     data = json.loads(data)
 
     assert status == 200
     assert  {'body': '', 'method': 'GET', 'params': {}, 'path': '/'} == data
 
-def test_auth_is_set_correctly(event_loop):
+@mark.asyncio
+async def test_auth_is_set_correctly(event_loop):
     connection = AIOHttpConnection(http_auth=('user', 'secret'), loop=event_loop)
     assert connection.session._default_auth == aiohttp.BasicAuth('user', 'secret')
 
@@ -27,9 +28,9 @@ def test_auth_is_set_correctly(event_loop):
     assert connection.session._default_auth == aiohttp.BasicAuth('user', 'secret')
 
 @mark.asyncio
-def test_request_is_properly_logged(connection, caplog, port, server):
+async def test_request_is_properly_logged(connection, caplog, port, server):
     server.register_response('/_cat/indices', {'cat': 'indices'})
-    yield from connection.perform_request('GET', '/_cat/indices', body=b'{}', params={"format": "json"})
+    await connection.perform_request('GET', '/_cat/indices', body=b'{}', params={"format": "json"})
 
     for logger, level, message in caplog.record_tuples:
         if logger == 'elasticsearch' and level == logging.INFO:
@@ -42,10 +43,10 @@ def test_request_is_properly_logged(connection, caplog, port, server):
     assert ('elasticsearch', logging.DEBUG, '< {"cat": "indices"}') in caplog.record_tuples
 
 @mark.asyncio
-def test_error_is_properly_logged(connection, caplog, port, server):
+async def test_error_is_properly_logged(connection, caplog, port, server):
     server.register_response('/i', status=404)
     with raises(NotFoundError):
-        yield from connection.perform_request('GET', '/i', params={'some': 'data'})
+        await connection.perform_request('GET', '/i', params={'some': 'data'})
 
     for logger, level, message in caplog.record_tuples:
         if logger == 'elasticsearch' and level == logging.WARNING:
@@ -55,22 +56,23 @@ def test_error_is_properly_logged(connection, caplog, port, server):
         assert False, "Log not received"
 
 @mark.asyncio
-def test_timeout_is_properly_raised(connection, server):
-    @asyncio.coroutine
-    def slow_request():
-        yield from asyncio.sleep(0.01)
+async def test_timeout_is_properly_raised(connection, server):
+    async def slow_request():
+        await asyncio.sleep(0.01)
         return {}
     server.register_response('/_search', slow_request())
 
     with raises(ConnectionTimeout):
-        yield from connection.perform_request('GET', '/_search', timeout=0.0001)
+        await connection.perform_request('GET', '/_search', timeout=0.0001)
 
 
-def test_dns_cache_is_enabled_by_default(event_loop):
+@mark.asyncio
+async def test_dns_cache_is_enabled_by_default(event_loop):
     connection = AIOHttpConnection(loop=event_loop)
     assert connection.session.connector.use_dns_cache is True
 
 
-def test_dns_cache_can_be_disabled(event_loop):
+@mark.asyncio
+async def test_dns_cache_can_be_disabled(event_loop):
     connection = AIOHttpConnection(loop=event_loop, use_dns_cache=False)
     assert connection.session.connector.use_dns_cache is False
