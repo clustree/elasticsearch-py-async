@@ -58,8 +58,7 @@ class AsyncTransport(Transport):
         if self.sniff_on_connection_fail:
             self.initiate_sniff()
 
-    @asyncio.coroutine
-    def _get_sniff_data(self, initial=False):
+    async def _get_sniff_data(self, initial=False):
         previous_sniff = self.last_sniff
 
         # reset last_sniff timestamp
@@ -79,7 +78,7 @@ class AsyncTransport(Transport):
         try:
             while tasks:
                 # execute sniff requests in parallel, wait for first to return
-                done, tasks = yield from asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, loop=self.loop)
+                done, tasks = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, loop=self.loop)
                 # go through all the finished tasks
                 for t in done:
                     try:
@@ -102,8 +101,7 @@ class AsyncTransport(Transport):
             for t in chain(done, tasks):
                 t.cancel()
 
-    @asyncio.coroutine
-    def sniff_hosts(self, initial=False):
+    async def sniff_hosts(self, initial=False):
         """
         Obtain a list of nodes from the cluster and create a new connection
         pool using the information retrieved.
@@ -113,7 +111,7 @@ class AsyncTransport(Transport):
         :arg initial: flag indicating if this is during startup
             (``sniff_on_start``), ignore the ``sniff_timeout`` if ``True``
         """
-        node_info = yield from self._get_sniff_data(initial)
+        node_info = await self._get_sniff_data(initial)
 
         hosts = list(filter(None, (self._get_host_info(n) for n in node_info)))
 
@@ -128,15 +126,14 @@ class AsyncTransport(Transport):
         # close those connections that are not in use any more
         for c in orig_connections:
             if c not in self.connection_pool.connections:
-                yield from c.close()
+                await c.close()
 
-    @asyncio.coroutine
-    def main_loop(self, method, url, params, body, ignore=(), timeout=None):
+    async def main_loop(self, method, url, params, body, ignore=(), timeout=None):
         for attempt in range(self.max_retries + 1):
             connection = self.get_connection()
 
             try:
-                status, headers, data = yield from connection.perform_request(
+                status, headers, data = await connection.perform_request(
                         method, url, params, body, ignore=ignore, timeout=timeout)
             except TransportError as e:
                 if method == 'HEAD' and e.status_code == 404:

@@ -41,8 +41,7 @@ class AIOHttpConnection(Connection):
     def close(self):
         return self.session.close()
 
-    @asyncio.coroutine
-    def perform_request(self, method, url, params=None, body=None, timeout=None, ignore=()):
+    async def perform_request(self, method, url, params=None, body=None, timeout=None, ignore=()):
         url_path = url
         if params:
             url_path = '%s?%s' % (url, urlencode(params or {}))
@@ -52,8 +51,8 @@ class AIOHttpConnection(Connection):
         response = None
         try:
             with aiohttp.Timeout(timeout or self.timeout):
-                response = yield from self.session.request(method, url, data=body)
-                raw_data = yield from response.text()
+                response = await self.session.request(method, url, data=body)
+                raw_data = await response.text()
             duration = self.loop.time() - start
 
         except Exception as e:
@@ -66,7 +65,7 @@ class AIOHttpConnection(Connection):
 
         finally:
             if response is not None:
-                yield from response.release()
+                await response.release()
 
         # raise errors based on http status codes, let the client handle those if needed
         if not (200 <= response.status < 300) and response.status not in ignore:
